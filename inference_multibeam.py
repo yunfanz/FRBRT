@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     graph = load_graph(args.model)
     TSTEP = 1024 #window of time stamps
-    NBEAMS = 352
+    NBEAMS = 351
 
     # We access the input and output nodes 
     is_training = graph.get_tensor_by_name('prefix/is_training:0')
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     files = find_files(args.filterbank_dir, pattern='2018*.fil')
     print(len(files))
-    files = sorted(files)
+    files = sorted(files)[1:] #ignore primary beam
     print(files[:NBEAMS])
     readers = get_readers(files, NBEAMS)
     NT = readers[0].n_ints_in_file
