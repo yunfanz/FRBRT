@@ -4,6 +4,8 @@ from utils import find_files
 from blimpy import Waterfall
 import os
 from time import time
+from skimage import measure
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", default="./models/molonglo.pb", type=str, help="Frozen model file to import")
 parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, help="Directory containing filterbanks")
@@ -38,6 +40,16 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=320):
         a[i, ..., 0] = readers[i].data.squeeze()
     return a
 
+def filter_detection(detections, n=3):
+    """Function to filter out detections in more than n adjacent beams"""
+    lab = measure.label(detections)
+    cluster, count = np.unique(lab, return_counts=True)
+    for i, c in enumerate(cluster):
+        if c == 0: continue
+        if count[i] > n:
+            detections[lab==cluster] = False
+    return detections
+    
 if __name__ == '__main__':
 
     graph = load_graph(args.model)
@@ -75,8 +87,8 @@ if __name__ == '__main__':
                 print'{} / {},  speed: {} times real time'.format(t0,NT, speed) #print(y_out.shape)
             scores = y_out[:,1].copy()
             detections = scores > 0.5
-            #detections = detections[:,np.newaxis]
+            detections = filter_detection(detections, n=3) 
             ndetections = np.sum(detections)
-            if ndetections > 0 and ndetections < 5: #if triggering in at least 1 beam but less than 3 beams
+            if ndetections > 0 and ndetections<5:
                 beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
                 print("Detections ",t0, beams_with_detection, scores[beams_with_detection])
