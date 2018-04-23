@@ -70,8 +70,10 @@ if __name__ == '__main__':
     NT = readers[0].n_ints_in_file
     dt = readers[0].header['tsamp']
     print('sampling time', dt)
-
-    with tf.Session(graph=graph) as sess:
+    
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(graph=graph, config=config) as sess:
         t0 = 0
         a = None
         while t0 + TSTEP < NT:
