@@ -1,6 +1,6 @@
 import tensorflow as tf, numpy as np
 import argparse 
-from image_reader import find_files
+from utils import find_files
 from blimpy import Waterfall
 import os
 from time import time
