@@ -1,5 +1,5 @@
 import os, fnmatch
-
+import numpy as np
 def find_files(directory, pattern='*.png', sortby="shuffle"):
     '''Recursively finds all files matching the pattern.'''
     files = []

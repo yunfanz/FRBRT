@@ -75,6 +75,7 @@ if __name__ == '__main__':
                 print'{} / {},  speed: {} times real time'.format(t0,NT, speed) #print(y_out.shape)
             scores = y_out[:,1].copy()
             detections = scores > 0.5
+            #detections = detections[:,np.newaxis]
             ndetections = np.sum(detections)
             if ndetections > 0 and ndetections < 5: #if triggering in at least 1 beam but less than 3 beams
                 beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
