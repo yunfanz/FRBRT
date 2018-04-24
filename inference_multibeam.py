@@ -33,11 +33,12 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=320):
     array of shape (nbeam, tstep, nchan, 1)
     """
     nbeams = len(readers)
+    u8 = (readers[0].header['nbits'] == 8)
     if a is None:
         a = np.zeros((nbeams, tstep, nchan, 1), dtype=np.float32)
     for i in range(nbeams):
         readers[i].read_data(t_start=t0, t_stop=t0+tstep)
-        a[i, ..., 0] = readers[i].data.squeeze()
+        a[i, ..., 0] = readers[i].data.squeeze().astype('uint8').astype(np.float32)
     return a
 
 def filter_detection(detections, n=3):
