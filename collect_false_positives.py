@@ -1,6 +1,6 @@
 import tensorflow as tf, numpy as np
 import argparse 
-from image_reader import find_files
+from utils import find_files
 from blimpy import Waterfall
 import os
 from time import time
@@ -34,8 +34,8 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=320):
     if a is None:
         a = np.zeros((nbeams, tstep, nchan, 1), dtype=np.uint8)
     for i in range(nbeams):
-        readers[i].read_data(t_start=t0, t_stop=t0+tstep).astype('uint8')
-        a[i, ..., 0] = readers[i].data.squeeze()
+        readers[i].read_data(t_start=t0, t_stop=t0+tstep)
+        a[i, ..., 0] = readers[i].data.squeeze().astype('uint8')
     return a
 
 def get_name(fname, t0):
