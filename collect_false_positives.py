@@ -32,9 +32,9 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=320):
     """
     nbeams = len(readers)
     if a is None:
-        a = np.zeros((nbeams, tstep, nchan, 1), dtype=np.float32)
+        a = np.zeros((nbeams, tstep, nchan, 1), dtype=np.uint8)
     for i in range(nbeams):
-        readers[i].read_data(t_start=t0, t_stop=t0+tstep).astype('uint8').astype(np.float32)
+        readers[i].read_data(t_start=t0, t_stop=t0+tstep).astype('uint8')
         a[i, ..., 0] = readers[i].data.squeeze()
     return a
 
