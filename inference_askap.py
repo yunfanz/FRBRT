@@ -141,8 +141,8 @@ if __name__ == '__main__':
                     detections = detections.reshape((nbeams_present, -1))
                     print detections.shape
                     for i, val in enumerate(detections): #loop over beam
-                       if val is None: continue
                        for j, jval in enumerate(val): #loop over time stamps
+                           if not jval: continue
                            fname = get_name(sorted(files)[i], t0+j*TSTEP, level=4)
                            print "Saving", outdir+fname
                            np.save(outdir+fname, a[i+j*nbeams_present].squeeze())
