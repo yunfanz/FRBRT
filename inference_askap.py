@@ -26,6 +26,8 @@ def get_readers(fil_files, nbeams=36, load_data=True):
     if nbeams is None:
         nbeams = len(fil_files)
     for f in sorted(fil_files)[:nbeams]:
+        if load_data:
+            print "loading into memory", f
         wfs.append(Waterfall(f, load_data=load_data))
     return wfs
 
@@ -40,7 +42,7 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=336, inmem=True):
         a = np.zeros((nbeams, tstep, nchan, 1), dtype=np.uint8)
     for i in range(nbeams):
         if inmem:
-            a[i, ..., 0] = readers[i].data.squeeze()[t0:to+tstep].astype('uint8')
+            a[i, ..., 0] = readers[i].data.squeeze()[t0:t0+tstep].astype('uint8')
         else:
             readers[i].read_data(t_start=t0, t_stop=t0+tstep)
             a[i, ..., 0] = readers[i].data.squeeze().astype('uint8')
@@ -103,6 +105,7 @@ if __name__ == '__main__':
             t0 = 0
             a = None
             while t0 + TSTEP < NT:
+                start_read = time()
                 a = read_input(readers, t0, a=a)
                 t0 += TSTEP
             #print(a.shape, a.dtype)
@@ -112,7 +115,8 @@ if __name__ == '__main__':
                 duration = time() - start
                 if t0 % 10240 == 0:
                     speed = dt*TSTEP/duration
-                    print'{} / {},  speed: {} times real time'.format(t0,NT, speed) #print(y_out.shape)
+                    read_time = start - start_read
+                    print'{} / {},  speed: {} times real time, reading time'.format(t0,NT, speed, read_time) #print(y_out.shape)
                 scores = y_out[:,1].copy()
                 detections = scores > 0.5
                 for i, val in enumerate(detections):
