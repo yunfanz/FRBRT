@@ -56,7 +56,7 @@ if __name__ == '__main__':
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    files = find_files(args.filterbank_dir, pattern='2018*.fil')
+    files = find_files(args.filterbank_dir, pattern='201*.fil')
     print(len(files))
     print(sorted(files[:NBEAMS]))
     readers = get_readers(files, NBEAMS)

@@ -20,7 +20,7 @@ def load_graph(frozen_graph_filename):
         tf.import_graph_def(graph_def, name="prefix")
     return graph
 
-def get_readers(fil_files, nbeams=16):
+def get_readers(fil_files, nbeams=36):
     """Load blimpy Waterfall objects for filterbank file reading"""
     wfs = []
     if nbeams is None:
@@ -62,7 +62,9 @@ if __name__ == '__main__':
     graph = load_graph(args.model)
     TSTEP = 1024 #window of time stamps
     NBEAMS = None
-
+    outdir = './false_pos/'
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
     # We access the input and output nodes 
     is_training = graph.get_tensor_by_name('prefix/is_training:0')
     x = graph.get_tensor_by_name('prefix/input_placeholder:0')
@@ -78,6 +80,8 @@ if __name__ == '__main__':
     print "processing {}  observations".format(len(observations))
     for ob in observations:
         files = find_files(ob, pattern='201*.fil')
+        if len(files) < 30:
+           continue
         #import IPython; IPython.embed()#print(len(files))
         files = sorted(files)
         print(files[:72])
@@ -104,9 +108,14 @@ if __name__ == '__main__':
                     print'{} / {},  speed: {} times real time'.format(t0,NT, speed) #print(y_out.shape)
                 scores = y_out[:,1].copy()
                 detections = scores > 0.5
-                detections = filter_detection(detections, n=3) 
-                detections = detections.reshape((-1))
-                ndetections = np.sum(detections)
-                #if ndetections > 0 and ndetections<5:
-                beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
-                print("Detections ",t0, beams_with_detection, scores[beams_with_detection])
+                for i, val in enumerate(detections):
+                   if not val: continue
+                   fname = get_name(sorted(files)[i], t0)
+                   print "Saving", outdir+fname
+                   np.save(outdir+fname, a[i].squeeze())
+                #detections = filter_detection(detections, n=3) 
+                #detections = detections.reshape((-1))
+                #ndetections = np.sum(detections)
+                ##if ndetections > 0 and ndetections<5:
+                #beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
+                #print("Detections ",t0, beams_with_detection, scores[beams_with_detection])
