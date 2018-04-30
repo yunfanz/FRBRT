@@ -24,12 +24,12 @@ def get_readers(fil_files, nbeams=16):
     """Load blimpy Waterfall objects for filterbank file reading"""
     wfs = []
     if nbeams is None:
-        nbeams = len(file_files)
+        nbeams = len(fil_files)
     for f in sorted(fil_files)[:nbeams]:
         wfs.append(Waterfall(f, load_data=False))
     return wfs
 
-def read_input(readers, t0, a=None, tstep=1024, nchan=320):
+def read_input(readers, t0, a=None, tstep=1024, nchan=336):
     """Read a chunck of data from each beam
     output:
     array of shape (nbeam, tstep, nchan, 1)
@@ -67,17 +67,18 @@ if __name__ == '__main__':
     is_training = graph.get_tensor_by_name('prefix/is_training:0')
     x = graph.get_tensor_by_name('prefix/input_placeholder:0')
     y = graph.get_tensor_by_name('prefix/output:0')
-
-    if args.filterbank_dir.starts_with("SB"):
+    basedir = os.path.basename(os.path.normpath(args.filterbank_dir))
+    if basedir.startswith("SB"):
         observations = [os.path.join([args.filterbank_dir, sdir]) for sdir in os.listdir(args.filterbank_dir)]
-    elif args.filterbank_dir.starts_with("20"):
-        observaions = [args.filterbank_dir]
+    elif basedir.startswith("20"):
+        observations = [args.filterbank_dir]
     else:
-        raise(Exception) "filterbank_dir must be observation or scheduling block"
+        print basedir, args.filterbank_dir
+        raise ValueError("filterbank_dir must be observation or scheduling block")
     print "processing {}  observations".format(len(observations))
     for ob in observations:
         files = find_files(ob, pattern='201*.fil')
-        print(len(files))
+        #import IPython; IPython.embed()#print(len(files))
         files = sorted(files)
         print(files[:72])
         readers = get_readers(files, NBEAMS)
@@ -104,6 +105,7 @@ if __name__ == '__main__':
                 scores = y_out[:,1].copy()
                 detections = scores > 0.5
                 detections = filter_detection(detections, n=3) 
+                detections = detections.reshape((-1))
                 ndetections = np.sum(detections)
                 #if ndetections > 0 and ndetections<5:
                 beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
