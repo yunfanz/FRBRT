@@ -5,8 +5,9 @@ from blimpy import Waterfall
 import os
 from time import time
 from skimage import measure
-
+from collect_false_positives import get_name
 parser = argparse.ArgumentParser()
+
 parser.add_argument("--model", default="./models/molonglo.pb", type=str, help="Frozen model file to import")
 parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, help="Directory containing filterbanks")
 args = parser.parse_args()
@@ -110,7 +111,7 @@ if __name__ == '__main__':
                 detections = scores > 0.5
                 for i, val in enumerate(detections):
                    if not val: continue
-                   fname = get_name(sorted(files)[i], t0)
+                   fname = get_name(sorted(files)[i], t0, level=4)
                    print "Saving", outdir+fname
                    np.save(outdir+fname, a[i].squeeze())
                 #detections = filter_detection(detections, n=3) 

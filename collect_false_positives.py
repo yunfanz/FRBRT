@@ -38,8 +38,8 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=320):
         a[i, ..., 0] = readers[i].data.squeeze().astype('uint8')
     return a
 
-def get_name(fname, t0):
-    basename = '_'.join(fname.split('/')[-2:])
+def get_name(fname, t0, level=2):
+    basename = '_'.join(fname.split('/')[-level:])
     return basename.split('.')[0]+'_'+str(t0)+'.npy'
 if __name__ == '__main__':
 
