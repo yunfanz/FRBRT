@@ -83,6 +83,7 @@ if __name__ == '__main__':
     is_training = graph.get_tensor_by_name('prefix/is_training:0')
     x = graph.get_tensor_by_name('prefix/input_placeholder:0')
     y = graph.get_tensor_by_name('prefix/output:0')
+
     basedir = os.path.basename(os.path.normpath(args.filterbank_dir))
     if basedir.startswith("SB"):
         observations = sorted([os.path.join(args.filterbank_dir, sdir) for sdir in os.listdir(args.filterbank_dir)])
@@ -92,34 +93,36 @@ if __name__ == '__main__':
         print basedir, args.filterbank_dir
         raise ValueError("filterbank_dir must be observation or scheduling block")
     print "processing {}  observations".format(len(observations))
-    for ob in observations:
-        antennas = sorted([os.path.join(ob, sdir) for sdir in os.listdir(ob)])
-        for ant in antennas:
-            files = sorted(find_files(ant, pattern='201*.fil'))
-            if len(files) == 0:
-                print "no files in", ant
-                continue
-            beam_ids = [int(fn.split('.')[-2]) for fn in files]
-            nbeams_present = len(beam_ids)
-            readers = get_readers(files, nbeams_present)
-            if max(beam_ids) > 35:
-                NBEAMS = 72
-            else:
-                NBEAMS = 36
-            print "{} / {} beams present".format(nbeams_present, NBEAMS)
-            NT = readers[0].n_ints_in_file
-            dt = readers[0].header['tsamp']
-            print('sampling time', dt)
-        
-            config = tf.ConfigProto()
-            config.gpu_options.allow_growth = True
-            with tf.Session(graph=graph, config=config) as sess:
+
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(graph=graph, config=config) as sess:
+
+        for ob in observations:
+            antennas = sorted([os.path.join(ob, sdir) for sdir in os.listdir(ob)])
+            for ant in antennas:
+                files = sorted(find_files(ant, pattern='201*.fil'))
+                if len(files) == 0:
+                    print "no files in", ant
+                    continue
+                beam_ids = [int(fn.split('.')[-2]) for fn in files]
+                nbeams_present = len(beam_ids)
+                readers = get_readers(files, nbeams_present)
+                if max(beam_ids) > 35:
+                    NBEAMS = 72
+                else:
+                    NBEAMS = 36
+                print "{} / {} beams present".format(nbeams_present, NBEAMS)
+                NT = readers[0].n_ints_in_file
+                dt = readers[0].header['tsamp']
+                print('sampling time', dt)
+            
                 t0 = 0
                 a = None
                 batch_size = 10
                 while t0 < NT:
                     start_read = time()
-                    while t0 + TSTEP*batch_size > NT and batch_size>=1:
+                    while t0 + TSTEP*batch_size > NT and batch_size>1:
                         batch_size /= 2
                         print "Adjusting batch_size", batch_size
                         
@@ -128,10 +131,11 @@ if __name__ == '__main__':
                     start = time()
                     y_out = sess.run(y, feed_dict={ x: a, is_training:False })
                     duration = time() - start
-                    if t0 % 10240 == 0:
-                        speed = dt*TSTEP/duration
-                        read_time = start - start_read
-                        print'{} / {},  speed: {} times real time, reading time'.format(t0,NT, speed, read_time) #print(y_out.shape)
+
+                    speed = dt*TSTEP/duration
+                    read_time = start - start_read
+                    print'{} / {},  speed: {} times real time, reading time'.format(t0,NT, speed, read_time) #print(y_out.shape)
+                    
                     scores = y_out[:,1].copy()
                     detections = scores > 0.5
                     detections = detections.reshape((nbeams_present, -1))
