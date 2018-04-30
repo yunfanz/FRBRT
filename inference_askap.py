@@ -37,6 +37,9 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=336, inmem=True):
     array of shape (nbeam, tstep, nchan, 1)
     """
     nbeams = len(readers)
+    if t0+tstep >= readers[0].n_ints_in_file:
+        t0 = readers[0].n_ints_in_file - tstep - 1
+   # print t0, tstep, readers[0].n_ints_in_file
     u8 = (readers[0].header['nbits'] == 8)
     if a is None:
         a = np.zeros((nbeams, tstep, nchan, 1), dtype=np.uint8)
@@ -95,6 +98,8 @@ if __name__ == '__main__':
         files = sorted(files)
         print(files[:72])
         readers = get_readers(files, NBEAMS)
+        for reader in readers:
+            print reader.n_ints_in_file
         NT = readers[0].n_ints_in_file
         dt = readers[0].header['tsamp']
         print('sampling time', dt)
