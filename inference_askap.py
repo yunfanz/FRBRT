@@ -85,7 +85,7 @@ if __name__ == '__main__':
     y = graph.get_tensor_by_name('prefix/output:0')
     basedir = os.path.basename(os.path.normpath(args.filterbank_dir))
     if basedir.startswith("SB"):
-        observations = [os.path.join([args.filterbank_dir, sdir]) for sdir in os.listdir(args.filterbank_dir)]
+        observations = sorted([os.path.join(args.filterbank_dir, sdir) for sdir in os.listdir(args.filterbank_dir)])
     elif basedir.startswith("20"):
         observations = [args.filterbank_dir]
     else:
@@ -93,9 +93,12 @@ if __name__ == '__main__':
         raise ValueError("filterbank_dir must be observation or scheduling block")
     print "processing {}  observations".format(len(observations))
     for ob in observations:
-        antennas = [os.path.join([ob, sdir]) for sdir in os.listdir(ob)]
+        antennas = sorted([os.path.join(ob, sdir) for sdir in os.listdir(ob)])
         for ant in antennas:
-            files = sorted(find_files(ob, pattern='201*.fil'))
+            files = sorted(find_files(ant, pattern='201*.fil'))
+            if len(files) == 0:
+                print "no files in", ant
+                continue
             beam_ids = [int(fn.split('.')[-2]) for fn in files]
             nbeams_present = len(beam_ids)
             readers = get_readers(files, nbeams_present)
@@ -116,14 +119,12 @@ if __name__ == '__main__':
                 batch_size = 10
                 while t0 < NT:
                     start_read = time()
-                    if t0 + TSTEP*batch_size > NT and batch_size>=1:
+                    while t0 + TSTEP*batch_size > NT and batch_size>=1:
                         batch_size /= 2
                         print "Adjusting batch_size", batch_size
                         
                     a = read_input(readers, t0, a=a, batch_size=batch_size)
-                    t0 += TSTEP
-                #print(a.shape, a.dtype)
-                #import IPython; IPython.embed()
+         
                     start = time()
                     y_out = sess.run(y, feed_dict={ x: a, is_training:False })
                     duration = time() - start
@@ -133,11 +134,14 @@ if __name__ == '__main__':
                         print'{} / {},  speed: {} times real time, reading time'.format(t0,NT, speed, read_time) #print(y_out.shape)
                     scores = y_out[:,1].copy()
                     detections = scores > 0.5
+                    detections = detections.reshape((nbeams_present, -1))
                     for i, val in enumerate(detections):
-                       if not val: continue
-                       fname = get_name(sorted(files)[i], t0, level=4)
-                       print "Saving", outdir+fname
-                       np.save(outdir+fname, a[i].squeeze())
+                       if val is None: continue
+                       for j, jval in enumerate(val):
+                           fname = get_name(sorted(files)[i], t0+j*TSTEP, level=4)
+                           print "Saving", outdir+fname
+                           np.save(outdir+fname, a[i].squeeze())
+                    t0 += TSTEP*batch_size
                     #detections = filter_detection(detections, n=3) 
                     #detections = detections.reshape((-1))
                     #ndetections = np.sum(detections)
