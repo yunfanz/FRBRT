@@ -138,13 +138,13 @@ if __name__ == '__main__':
                     
                     scores = y_out[:,1].copy()
                     detections = scores > 0.5
-                    detections = detections.reshape((nbeams_present, -1))
-                    for i, val in enumerate(detections):
+                    detections = detections.reshape((-1, nbeams_present))
+                    for i, val in enumerate(detections): #loop over beam
                        if val is None: continue
-                       for j, jval in enumerate(val):
+                       for j, jval in enumerate(val): #loop over time stamps
                            fname = get_name(sorted(files)[i], t0+j*TSTEP, level=4)
                            print "Saving", outdir+fname
-                           np.save(outdir+fname, a[i].squeeze())
+                           np.save(outdir+fname, a[i+j*TSTEP].squeeze())
                     t0 += TSTEP*batch_size
                     #detections = filter_detection(detections, n=3) 
                     #detections = detections.reshape((-1))
