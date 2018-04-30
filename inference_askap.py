@@ -20,16 +20,16 @@ def load_graph(frozen_graph_filename):
         tf.import_graph_def(graph_def, name="prefix")
     return graph
 
-def get_readers(fil_files, nbeams=36):
+def get_readers(fil_files, nbeams=36, load_data=True):
     """Load blimpy Waterfall objects for filterbank file reading"""
     wfs = []
     if nbeams is None:
         nbeams = len(fil_files)
     for f in sorted(fil_files)[:nbeams]:
-        wfs.append(Waterfall(f, load_data=False))
+        wfs.append(Waterfall(f, load_data=load_data))
     return wfs
 
-def read_input(readers, t0, a=None, tstep=1024, nchan=336):
+def read_input(readers, t0, a=None, tstep=1024, nchan=336, inmem=True):
     """Read a chunck of data from each beam
     output:
     array of shape (nbeam, tstep, nchan, 1)
@@ -39,8 +39,11 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=336):
     if a is None:
         a = np.zeros((nbeams, tstep, nchan, 1), dtype=np.uint8)
     for i in range(nbeams):
-        readers[i].read_data(t_start=t0, t_stop=t0+tstep)
-        a[i, ..., 0] = readers[i].data.squeeze().astype('uint8')
+        if inmem:
+            a[i, ..., 0] = readers[i].data.squeeze()[t0:to+tstep].astype('uint8')
+        else:
+            readers[i].read_data(t_start=t0, t_stop=t0+tstep)
+            a[i, ..., 0] = readers[i].data.squeeze().astype('uint8')
     return a
 
 def get_name(fname, t0, level=4):
