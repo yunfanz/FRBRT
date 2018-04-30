@@ -5,7 +5,6 @@ from blimpy import Waterfall
 import os
 from time import time
 from skimage import measure
-from collect_false_positives import get_name
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--model", default="./models/molonglo.pb", type=str, help="Frozen model file to import")
@@ -43,6 +42,10 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=336):
         readers[i].read_data(t_start=t0, t_stop=t0+tstep)
         a[i, ..., 0] = readers[i].data.squeeze().astype('uint8')
     return a
+
+def get_name(fname, t0, level=4):
+    basename = '_'.join(fname.split('/')[-level:])
+    return '_'.join(basename.split('.')[:-1])+'_'+str(t0)+'.npy'
 
 def filter_detection(detections, n=3, nbeams=33):
     """Function to filter out detections in more than n adjacent beams"""
