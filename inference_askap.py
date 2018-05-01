@@ -57,11 +57,13 @@ def get_name(fname, t0, level=4):
     basename = '_'.join(fname.split('/')[-level:])
     return '_'.join(basename.split('.')[:-1])+'_'+str(t0)+'.npy'
 
-def filter_detection(detections, n=3, nbeams=36):
+def filter_detection(detections, beam_ids, n=3, nbeam=36):
     """Function to filter out detections in more than n adjacent beams"""
-    detections = detections.reshape((-1,36))
-    detections[:,-1] = 0 #mask out bad beams
-    detections = detections.reshape((-1,6,6))
+    #detections = detections.reshape((-1,36))
+    detections[-1,:] = 0 #mask out bad beams
+    if detections.shape[0] != nbeam:
+        raise ValueError('Missing Beams')
+    detections = detections.T.reshape((-1,6,6))
     labs = [measure.label(antenna) for antenna in detections]
     for ant, lab in enumerate(labs):
         cluster, count = np.unique(lab, return_counts=True)
@@ -69,6 +71,7 @@ def filter_detection(detections, n=3, nbeams=36):
             if c == 0: continue
             if count[i] > n:
                 detections[ant][lab==cluster] = False
+    #detections = detections.reshape((-1, 36))
     return detections
     
 if __name__ == '__main__':
@@ -139,10 +142,12 @@ if __name__ == '__main__':
                     print'{} / {},  speed: {} times real time, reading time'.format(t0,NT, speed, read_time) #print(y_out.shape)
                     
                     scores = y_out[:,1].copy()
+                    scores = scores.reshape((nbeams_present, -1))
                     detections = scores > 0.5
-                    print "False positive rate {}".format(float(np.sum(detections))/detections.size))
-                    detections = detections.reshape((nbeams_present, -1))
+                    print "False positive rate {}".format(float(np.sum(detections))/detections.size)
                     print detections.shape
+
+                    # Save false positives
                     for i, val in enumerate(detections): #loop over beam
                        for j, jval in enumerate(val): #loop over time stamps
                            if not jval: continue
@@ -150,9 +155,13 @@ if __name__ == '__main__':
                            print "Saving", outdir+fname
                            np.save(outdir+fname, a[i+j*nbeams_present].squeeze())
                     t0 += TSTEP*batch_size
-                    #detections = filter_detection(detections, n=3) 
-                    #detections = detections.reshape((-1))
-                    #ndetections = np.sum(detections)
-                    ##if ndetections > 0 and ndetections<5:
-                    #beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
-                    #print("Detections ",t0, beams_with_detection, scores[beams_with_detection])
+
+                    #report detections
+                    detections = filter_detection(detections, beam_ids, n=3) 
+                    ndetections = np.sum(detections, axis=(1,2))
+                    for j, nd in enumerate(ndetections):
+                        if nd > 0:
+                            print detections[j]
+                            print scores[:,j].reshape((6,6))
+                            #beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
+                            print("Detections ",t0+j*TSTEP)
