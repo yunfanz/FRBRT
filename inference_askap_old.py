@@ -9,7 +9,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--in_memory", default=False, type=bool, help="Frozen model file to import")
 parser.add_argument("--model", default="./models/molonglo.pb", type=str, help="Frozen model file to import")
 parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, help="Directory containing filterbanks")
-parser.add_argument("--out_dir", default="./false_pos/", type=str, help="Directory store false positives")
 args = parser.parse_args()
 
 def load_graph(frozen_graph_filename):
@@ -21,7 +20,7 @@ def load_graph(frozen_graph_filename):
         tf.import_graph_def(graph_def, name="prefix")
     return graph
 
-def get_readers(fil_files, nbeams=36, load_data=True):
+def get_readers(fil_files, nbeams=36, load_data=False):
     """Load blimpy Waterfall objects for filterbank file reading"""
     wfs = []
     if nbeams is None:
@@ -32,11 +31,12 @@ def get_readers(fil_files, nbeams=36, load_data=True):
         wfs.append(Waterfall(f, load_data=load_data))
     return wfs
 
-def read_input(readers, t0, a=None, tstep=1024, nchan=336, inmem=True, batch_size=10):
+def read_input(readers, t0, a=None, tstep=1024, nchan=336, inmem=False, batch_size=10):
     """Read a chunck of data from each beam
     output:
     array of shape (nbeam, tstep, nchan, 1)
     """
+    print(inmem, args.in_memory)
     nbeams = len(readers) #actually present beams
     if t0+tstep >= readers[0].n_ints_in_file:
         t0 = readers[0].n_ints_in_file - tstep - 1
@@ -77,6 +77,9 @@ if __name__ == '__main__':
     TSTEP = 1024 #window of time stamps
 
     NBEAMS = None
+    outdir = './false_pos/'
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
     # We access the input and output nodes 
     is_training = graph.get_tensor_by_name('prefix/is_training:0')
     x = graph.get_tensor_by_name('prefix/input_placeholder:0')
@@ -91,65 +94,36 @@ if __name__ == '__main__':
         print basedir, args.filterbank_dir
         raise ValueError("filterbank_dir must be observation or scheduling block")
     print "processing {}  observations".format(len(observations))
-    outdir = os.path.join(args.out_dir, basedir)
-    print outdir
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     with tf.Session(graph=graph, config=config) as sess:
 
         for ob in observations:
-            antennas = sorted([os.path.join(ob, sdir) for sdir in os.listdir(ob)])
-            for ant in antennas:
-                files = sorted(find_files(ant, pattern='201*.fil'))
-                if len(files) == 0:
-                    print "no files in", ant
-                    continue
-                beam_ids = [int(fn.split('.')[-2]) for fn in files]
-                nbeams_present = len(beam_ids)
-                readers = get_readers(files, nbeams_present, load_data=args.in_memory)
-                if max(beam_ids) > 35:
-                    NBEAMS = 72
-                else:
-                    NBEAMS = 36
-                print "{} / {} beams present".format(nbeams_present, NBEAMS)
-                NT = min([reader.n_ints_in_file for reader in readers])
-                dt = readers[0].header['tsamp']
-                print('sampling time', dt)
-            
-                t0 = 0
-                a = None
-                batch_size = 10
-                while t0 < NT:
-                    start_read = time()
-                    while t0 + TSTEP*batch_size > NT and batch_size>1:
-                        batch_size /= 2
-                        print "Adjusting batch_size", batch_size
-                        
-                    a = read_input(readers, t0, a=a, batch_size=batch_size, inmem=args.in_memory)
-         
-                    start = time()
-                    y_out = sess.run(y, feed_dict={ x: a, is_training:False })
-                    duration = time() - start
-
-                    speed = dt*TSTEP/duration
-                    read_time = start - start_read
-                    print'{} / {},  speed: {} times real time, reading time'.format(t0,NT, speed, read_time) #print(y_out.shape)
-                    
-                    scores = y_out[:,1].copy()
-                    detections = scores > 0.5
-                    print "False positive rate {}".format(float(np.sum(detections))/detections.size))
-                    detections = detections.reshape((nbeams_present, -1))
-                    print detections.shape
-                    for i, val in enumerate(detections): #loop over beam
-                       for j, jval in enumerate(val): #loop over time stamps
-                           if not jval: continue
-                           fname = get_name(sorted(files)[i], t0+j*TSTEP, level=4)
-                           print "Saving", outdir+fname
-                           np.save(outdir+fname, a[i+j*nbeams_present].squeeze())
-                    t0 += TSTEP*batch_size
+            files = sorted(find_files(ob, pattern='201*.fil'))
+            NBEAMS = 36
+            readers = get_readers(files, None, load_data=False)
+            NT = readers[0].n_ints_in_file
+            dt = readers[0].header['tsamp']
+            t0 = 0
+            a = None
+            batch_size = 1
+            while t0 < NT:
+                a = read_input(readers, t0, a=a, batch_size=batch_size, inmem=args.in_memory)
+                start = time()
+                y_out = sess.run(y, feed_dict={ x: a, is_training:False })
+                duration = time() - start
+                speed = dt*TSTEP/duration
+                print'{} / {},  speed: {} times real time, reading time'.format(t0,NT, speed) #print(y_out.shape)    
+                scores = y_out[:,1].copy()
+                detections = scores > 0.5
+                print detections.shape
+                for i, val in enumerate(detections): #loop over beam
+                   if not val or i % NBEAMS==35: continue
+                   fname = get_name(sorted(files)[i], t0+TSTEP, level=4)
+                   print "Saving", outdir+fname
+                   np.save(outdir+fname, a[i].squeeze())
+                t0 += TSTEP
                     #detections = filter_detection(detections, n=3) 
                     #detections = detections.reshape((-1))
                     #ndetections = np.sum(detections)
