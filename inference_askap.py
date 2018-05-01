@@ -32,15 +32,15 @@ def get_readers(fil_files, nbeams=36, load_data=True):
         wfs.append(Waterfall(f, load_data=load_data))
     return wfs
 
-def read_input(readers, t0, a=None, tstep=1024, nchan=336, inmem=True, batch_size=10):
+def read_input(readers, t0, NT, a=None, tstep=1024, nchan=336, inmem=True, batch_size=10):
     """Read a chunck of data from each beam
     output:
     array of shape (nbeam, tstep, nchan, 1)
     """
     nbeams = len(readers) #actually present beams
-    if t0+tstep >= readers[0].n_ints_in_file:
-        t0 = readers[0].n_ints_in_file - tstep - 1
-   # print t0, tstep, readers[0].n_ints_in_file
+    if t0+tstep >= NT:
+        t0 = NT - tstep - 1
+    #print t0, tstep, 
     u8 = (readers[0].header['nbits'] == 8)
     if a is None:
         a = np.zeros((nbeams*batch_size, tstep, nchan, 1), dtype=np.uint8)
@@ -121,6 +121,9 @@ if __name__ == '__main__':
                     NBEAMS = 36
                 print "{} / {} beams present".format(nbeams_present, NBEAMS)
                 NT = min([reader.n_ints_in_file for reader in readers])
+                if NT != readers[0].n_ints_in_file:
+                    print("Warning: not all files have the same length!!!")
+                    print([reader.n_ints_in_file for reader in readers])
                 dt = readers[0].header['tsamp']
                 print('sampling time', dt)
             
@@ -133,7 +136,7 @@ if __name__ == '__main__':
                         batch_size /= 2
                         print "Adjusting batch_size", batch_size
                         
-                    a = read_input(readers, t0, a=a, batch_size=batch_size, inmem=args.in_memory)
+                    a = read_input(readers, t0, NT=NT, a=a, batch_size=batch_size, inmem=args.in_memory)
          
                     start = time()
                     y_out = sess.run(y, feed_dict={ x: a, is_training:False })
@@ -164,7 +167,7 @@ if __name__ == '__main__':
                     for j, nd in enumerate(ndetections):
                         if nd > 0:
                             print detections[j].astype(np.int8)
-                            np.set_printoptions(precision=2)
-                            print scores[:,j].reshape((6,6))
+                            #np.set_printoptions(precision=2)
+                            #print scores[:,j].reshape((6,6))
                             #beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
                             print("Detections ",t0+j*TSTEP)
