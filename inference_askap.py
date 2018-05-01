@@ -161,7 +161,8 @@ if __name__ == '__main__':
                     ndetections = np.sum(detections, axis=(1,2))
                     for j, nd in enumerate(ndetections):
                         if nd > 0:
-                            print detections[j]
+                            print detections[j].astype(np.int8)
+                            np.set_printoptions(precision=2)
                             print scores[:,j].reshape((6,6))
                             #beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
                             print("Detections ",t0+j*TSTEP)
