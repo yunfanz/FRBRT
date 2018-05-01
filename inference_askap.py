@@ -92,6 +92,8 @@ if __name__ == '__main__':
         raise ValueError("filterbank_dir must be observation or scheduling block")
     print "processing {}  observations".format(len(observations))
     outdir = os.path.join(args.out_dir, basedir)
+    if not outdir.endswith('/'):
+        outdir = outdir+'/'
     print outdir
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -140,7 +142,7 @@ if __name__ == '__main__':
                     
                     scores = y_out[:,1].copy()
                     detections = scores > 0.5
-                    print "False positive rate {}".format(float(np.sum(detections))/detections.size))
+                    print "False positive rate {}".format(float(np.sum(detections))/detections.size)
                     detections = detections.reshape((nbeams_present, -1))
                     print detections.shape
                     for i, val in enumerate(detections): #loop over beam
