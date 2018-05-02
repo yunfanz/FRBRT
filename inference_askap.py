@@ -37,7 +37,11 @@ def get_readers(fil_files, nbeams=36, load_data=True):
     for f in sorted(fil_files)[:nbeams]:
         if load_data:
             print "loading into memory", f
-        wfs.append(Waterfall(f, load_data=load_data))
+        try:
+            wfs.append(Waterfall(f, load_data=load_data))
+        except:
+            print('WARNING: Problem with file', f)
+            return None
     return wfs
 
 def read_input(readers, t0, NT, a=None, tstep=1024, nchan=336, inmem=True, batch_size=10):
@@ -123,6 +127,8 @@ if __name__ == '__main__':
                 beam_ids = [int(fn.split('.')[-2]) for fn in files]
                 nbeams_present = len(beam_ids)
                 readers = get_readers(files, nbeams_present, load_data=args.in_memory)
+                if readers is None:
+                    continue
                 if max(beam_ids) > 35:
                     NBEAMS = 72
                 else:
@@ -173,9 +179,14 @@ if __name__ == '__main__':
                     for i, val in enumerate(detections): #loop over beam
                        for j, jval in enumerate(val): #loop over time stamps
                            if not jval: continue
-                           fname = get_name(sorted(files)[i], t0+j*TSTEP, level=4)
+                           if nbeams_present < NBEAMS:
+                               #TODO: this doesn't work for SQ66
+                               ind = beam_ids.index(i)
+                           else:
+                               ind = i
+                           fname = get_name(sorted(files)[ind], t0+j*TSTEP, level=4)
                            print "Saving", outdir+fname
-                           np.save(outdir+fname, a[i+j*nbeams_present].squeeze())
+                           np.save(outdir+fname, a[ind+j*nbeams_present].squeeze())
                     t0 += TSTEP*batch_size
 
                     #report detections
