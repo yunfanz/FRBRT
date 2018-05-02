@@ -12,6 +12,14 @@ parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, he
 parser.add_argument("--out_dir", default="./false_pos/", type=str, help="Directory store false positives")
 args = parser.parse_args()
 
+SQ66 = [[21,20,19,18,17,16],
+        [22,7,6,5,4,35],
+        [23,8,1,0,15,34],
+        [24,9,3,2,14,33],
+        [25,10,11,12,13,32],
+        [26,27,28,29,30,31]]
+SQ66_lin = np.asarray(SQ66).reshape((36))
+
 def load_graph(frozen_graph_filename):
     """ Function to load frozen TensorFlow graph"""
     with tf.gfile.GFile(frozen_graph_filename, "rb") as f:
@@ -59,10 +67,10 @@ def get_name(fname, t0, level=4):
 
 def filter_detection(detections, beam_ids, n=3, nbeam=36):
     """Function to filter out detections in more than n adjacent beams"""
-    #detections = detections.reshape((-1,36))
-    detections[-1,:] = 0 #mask out bad beams
+    #detections is of shape (36 or nbeams, batch_size)
     if detections.shape[0] != nbeam:
-        raise ValueError('Missing Beams')
+        raise ValueError('Missing Beams') #shouldn't happen with zero filling implemented
+    detections[-1,:] = 0 #mask out bad beams
     detections = detections.T.reshape((-1,6,6))
     labs = [measure.label(antenna) for antenna in detections]
     for ant, lab in enumerate(labs):
@@ -148,6 +156,15 @@ if __name__ == '__main__':
                     
                     scores = y_out[:,1].copy()
                     scores = scores.reshape((nbeams_present, -1))
+                    if nbeams_present < NBEAMS:
+                        print "Zero filling missing beams!!"
+                        tmp_scores = np.zeros((NBEAMS, scores.shape[1]))
+                        for i, b in enumerate(beam_ids):
+                            tmp_scores[b] = scores[i]
+                        scores = tmp_scores
+
+                    if 'ak' in ant:
+                        scores = scores[SQ66_lin]
                     detections = scores > 0.5
                     print "False positive rate {}".format(float(np.sum(detections))/detections.size)
                     print detections.shape
@@ -163,6 +180,7 @@ if __name__ == '__main__':
 
                     #report detections
                     detections = filter_detection(detections, beam_ids, n=3) 
+                
                     ndetections = np.sum(detections, axis=(1,2))
                     for j, nd in enumerate(ndetections):
                         if nd > 0:
