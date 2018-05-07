@@ -12,6 +12,14 @@ parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, he
 parser.add_argument("--out_dir", default="./false_pos/", type=str, help="Directory store false positives")
 args = parser.parse_args()
 
+SQ66 = [[21,20,19,18,17,16],
+        [22,7,6,5,4,35],
+        [23,8,1,0,15,34],
+        [24,9,3,2,14,33],
+        [25,10,11,12,13,32],
+        [26,27,28,29,30,31]]
+SQ66_lin = np.asarray(SQ66).reshape((36))
+
 def load_graph(frozen_graph_filename):
     """ Function to load frozen TensorFlow graph"""
     with tf.gfile.GFile(frozen_graph_filename, "rb") as f:
@@ -29,18 +37,22 @@ def get_readers(fil_files, nbeams=36, load_data=True):
     for f in sorted(fil_files)[:nbeams]:
         if load_data:
             print "loading into memory", f
-        wfs.append(Waterfall(f, load_data=load_data))
+        try:
+            wfs.append(Waterfall(f, load_data=load_data))
+        except:
+            print('WARNING: Problem with file', f)
+            return None
     return wfs
 
-def read_input(readers, t0, a=None, tstep=1024, nchan=336, inmem=True, batch_size=10):
+def read_input(readers, t0, NT, a=None, tstep=1024, nchan=336, inmem=True, batch_size=10):
     """Read a chunck of data from each beam
     output:
     array of shape (nbeam, tstep, nchan, 1)
     """
     nbeams = len(readers) #actually present beams
-    if t0+tstep >= readers[0].n_ints_in_file:
-        t0 = readers[0].n_ints_in_file - tstep - 1
-   # print t0, tstep, readers[0].n_ints_in_file
+    if t0+tstep >= NT:
+        t0 = NT - tstep - 1
+    #print t0, tstep, 
     u8 = (readers[0].header['nbits'] == 8)
     if a is None:
         a = np.zeros((nbeams*batch_size, tstep, nchan, 1), dtype=np.uint8)
@@ -57,11 +69,13 @@ def get_name(fname, t0, level=4):
     basename = '_'.join(fname.split('/')[-level:])
     return '_'.join(basename.split('.')[:-1])+'_'+str(t0)+'.npy'
 
-def filter_detection(detections, n=3, nbeams=36):
+def filter_detection(detections, beam_ids, n=3, nbeam=36):
     """Function to filter out detections in more than n adjacent beams"""
-    detections = detections.reshape((-1,36))
-    detections[:,-1] = 0 #mask out bad beams
-    detections = detections.reshape((-1,6,6))
+    #detections is of shape (36 or nbeams, batch_size)
+    if detections.shape[0] != nbeam:
+        raise ValueError('Missing Beams') #shouldn't happen with zero filling implemented
+    detections[-1,:] = 0 #mask out bad beams
+    detections = detections.T.reshape((-1,6,6))
     labs = [measure.label(antenna) for antenna in detections]
     for ant, lab in enumerate(labs):
         cluster, count = np.unique(lab, return_counts=True)
@@ -69,6 +83,7 @@ def filter_detection(detections, n=3, nbeams=36):
             if c == 0: continue
             if count[i] > n:
                 detections[ant][lab==cluster] = False
+    #detections = detections.reshape((-1, 36))
     return detections
     
 if __name__ == '__main__':
@@ -92,6 +107,8 @@ if __name__ == '__main__':
         raise ValueError("filterbank_dir must be observation or scheduling block")
     print "processing {}  observations".format(len(observations))
     outdir = os.path.join(args.out_dir, basedir)
+    if not outdir.endswith('/'):
+        outdir = outdir+'/'
     print outdir
     if not os.path.exists(outdir):
         os.makedirs(outdir)
@@ -110,12 +127,17 @@ if __name__ == '__main__':
                 beam_ids = [int(fn.split('.')[-2]) for fn in files]
                 nbeams_present = len(beam_ids)
                 readers = get_readers(files, nbeams_present, load_data=args.in_memory)
+                if readers is None:
+                    continue
                 if max(beam_ids) > 35:
                     NBEAMS = 72
                 else:
                     NBEAMS = 36
                 print "{} / {} beams present".format(nbeams_present, NBEAMS)
                 NT = min([reader.n_ints_in_file for reader in readers])
+                if NT != readers[0].n_ints_in_file:
+                    print("Warning: not all files have the same length!!!")
+                    print([reader.n_ints_in_file for reader in readers])
                 dt = readers[0].header['tsamp']
                 print('sampling time', dt)
             
@@ -128,7 +150,7 @@ if __name__ == '__main__':
                         batch_size /= 2
                         print "Adjusting batch_size", batch_size
                         
-                    a = read_input(readers, t0, a=a, batch_size=batch_size, inmem=args.in_memory)
+                    a = read_input(readers, t0, NT=NT, a=a, batch_size=batch_size, inmem=args.in_memory)
          
                     start = time()
                     y_out = sess.run(y, feed_dict={ x: a, is_training:False })
@@ -139,20 +161,42 @@ if __name__ == '__main__':
                     print'{} / {},  speed: {} times real time, reading time'.format(t0,NT, speed, read_time) #print(y_out.shape)
                     
                     scores = y_out[:,1].copy()
+                    scores = scores.reshape((nbeams_present, -1))
+                    if nbeams_present < NBEAMS:
+                        print "Zero filling missing beams!!"
+                        tmp_scores = np.zeros((NBEAMS, scores.shape[1]))
+                        for i, b in enumerate(beam_ids):
+                            tmp_scores[b] = scores[i]
+                        scores = tmp_scores
+
+                    if 'ak' in ant:
+                        scores = scores[SQ66_lin]
                     detections = scores > 0.5
-                    print "False positive rate {}".format(float(np.sum(detections))/detections.size))
-                    detections = detections.reshape((nbeams_present, -1))
+                    print "False positive rate {}".format(float(np.sum(detections))/detections.size)
                     print detections.shape
+
+                    # Save false positives
                     for i, val in enumerate(detections): #loop over beam
                        for j, jval in enumerate(val): #loop over time stamps
                            if not jval: continue
-                           fname = get_name(sorted(files)[i], t0+j*TSTEP, level=4)
+                           if nbeams_present < NBEAMS:
+                               #TODO: this doesn't work for SQ66
+                               ind = beam_ids.index(i)
+                           else:
+                               ind = i
+                           fname = get_name(sorted(files)[ind], t0+j*TSTEP, level=4)
                            print "Saving", outdir+fname
-                           np.save(outdir+fname, a[i+j*nbeams_present].squeeze())
+                           np.save(outdir+fname, a[ind+j*nbeams_present].squeeze())
                     t0 += TSTEP*batch_size
-                    #detections = filter_detection(detections, n=3) 
-                    #detections = detections.reshape((-1))
-                    #ndetections = np.sum(detections)
-                    ##if ndetections > 0 and ndetections<5:
-                    #beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
-                    #print("Detections ",t0, beams_with_detection, scores[beams_with_detection])
+
+                    #report detections
+                    detections = filter_detection(detections, beam_ids, n=3) 
+                
+                    ndetections = np.sum(detections, axis=(1,2))
+                    for j, nd in enumerate(ndetections):
+                        if nd > 0:
+                            print detections[j].astype(np.int8)
+                            #np.set_printoptions(precision=2)
+                            #print scores[:,j].reshape((6,6))
+                            #beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
+                            print("Detections ",t0+j*TSTEP)
