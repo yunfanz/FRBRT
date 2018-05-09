@@ -95,4 +95,4 @@ if __name__ == '__main__':
             ndetections = np.sum(detections)
             if ndetections > 0 and ndetections<5:
                 beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
-                print("Detections ",t0, beams_with_detection, scores[beams_with_detection])
+                print("Detections ",t0, beams_with_detection+1, scores[beams_with_detection])
