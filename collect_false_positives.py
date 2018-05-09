@@ -5,7 +5,7 @@ from blimpy import Waterfall
 import os
 from time import time
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", default="./dump/frozen_model.pb", type=str, help="Frozen model file to import")
+parser.add_argument("--models", nargs='+', default="./dump/frozen_model.pb", type=str, help="Frozen model file to import")
 parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, help="Directory containing filterbanks")
 args = parser.parse_args()
 
