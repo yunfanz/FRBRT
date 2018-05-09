@@ -9,6 +9,7 @@ from skimage import measure
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", default="./models/molonglo.pb", type=str, help="Frozen model file to import")
 parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, help="Directory containing filterbanks")
+parser.add_argument("--test_flag", default=None, type=str, help="flag of file to test")
 args = parser.parse_args()
 
 def load_graph(frozen_graph_filename):
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     y = graph.get_tensor_by_name('prefix/output:0')
 
 
-    files = find_files(args.filterbank_dir, pattern='2018*.fil')
+    files = find_files(args.filterbank_dir, pattern='2018*.fil', flag=args.test_flag)
     print(len(files))
     files = sorted(files)[1:] #ignore primary beam
     print(files[:NBEAMS])
