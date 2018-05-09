@@ -9,13 +9,13 @@ parser.add_argument("--models", nargs='+', default="./dump/frozen_model.pb", typ
 parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, help="Directory containing filterbanks")
 args = parser.parse_args()
 
-def load_graph(frozen_graph_filename):
+def load_graph(frozen_graph_filename, name="prefix"):
     """ Function to load frozen TensorFlow graph"""
     with tf.gfile.GFile(frozen_graph_filename, "rb") as f:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())
     with tf.Graph().as_default() as graph:
-        tf.import_graph_def(graph_def, name="prefix")
+        tf.import_graph_def(graph_def, name=name)
     return graph
 
 def get_readers(fil_files, nbeams=16):
@@ -43,16 +43,16 @@ def get_name(fname, t0, level=2):
     return basename.split('.')[0]+'_'+str(t0)+'.npy'
 if __name__ == '__main__':
 
-    graph = load_graph(args.model)
+    graphs = [load_graph(model) for model in args.models]
     TSTEP = 1024 #window of time stamps
     NBEAMS = 352
 
     # We access the input and output nodes 
-    is_training = graph.get_tensor_by_name('prefix/is_training:0')
-    x = graph.get_tensor_by_name('prefix/input_placeholder:0')
-    y = graph.get_tensor_by_name('prefix/output:0')
+    is_training = [graph.get_tensor_by_name('prefix/is_training:0') for graph in graphs]
+    x = [graph.get_tensor_by_name('prefix/input_placeholder:0') for graph in graphs]
+    y = [graph.get_tensor_by_name('prefix/output:0') for graph in graphs]
     
-    outdir = "./false_positives/signa/"
+    outdirs = ["./false_positives/" + os.path.basename(model).split('.')[0] for model in args.models]
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
@@ -64,25 +64,27 @@ if __name__ == '__main__':
     dt = readers[0].header['tsamp']
     print('sampling time', dt)
     detection_stats = []
-    with tf.Session(graph=graph) as sess:
-        t0 = 0
-        a = None
-        while t0 + TSTEP < NT:
-            a = read_input(readers, t0, a=a)
-            t0 += TSTEP
-            #print(a.shape, a.dtype)
-            #import IPython; IPython.embed()
-            start = time()
-            y_out = sess.run(y, feed_dict={ x: a, is_training:False })
-            duration = time() - start
-            if t0 % 10240 == 0:
-                speed = dt*TSTEP/duration
-                print'{} / {},  speed: {} times real time'.format(t0,NT, speed)
-            scores = y_out[:,1].copy()
-            detections = scores > 0.5
-            for i, val in enumerate(detections):
-                if not val: continue
-                fname = get_name(sorted(files)[i], t0)
-                print "Saving", outdir+fname
-                np.save(outdir+fname, a[i].squeeze())
+    sessions = [tf.Session(graph=graph) for graph in graphs]
+    t0 = 0
+    a = None
+    while t0 + TSTEP < NT:
+        a = read_input(readers, t0, a=a)
+        t0 += TSTEP
+        #print(a.shape, a.dtype)
+        #import IPython; IPython.embed()
+        start = time()
+        y_outs = [sess.run(y, feed_dict={ x[i]: a, is_training[i]:False }) for i, sess in enumerate(sessions)]
+        duration = time() - start
+        if t0 % 10240 == 0:
+            speed = dt*TSTEP/duration
+            print'{} / {},  speed: {} times real time'.format(t0,NT, speed)
+        scores = np.asarray([y_out[:,1].copy() for y_out in y_outs])
+        detections = scores > 0.5
+
+        for i in range(detetions.shape[0]):
+            for j in range(detections.shape[1]):
+                if not detections[i,j]: continue
+                fname = get_name(sorted(files)[j], t0)
+                print "Saving", outdirs[i]+fname
+                np.save(outdirs[i]+fname, a[j].squeeze())
 
