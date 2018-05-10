@@ -76,7 +76,7 @@ if __name__ == '__main__':
             start = time()
             y_out = sess.run(y, feed_dict={ x: a, is_training:False })
             duration = time() - start
-            if t0 % 10240 == 0:
+            if (t0-args.offset)/TSTEP % 200 == 0:
                 speed = dt*TSTEP/duration
                 print'{} / {},  speed: {} times real time'.format(t0,NT, speed)
             scores = y_out[:,1].copy()

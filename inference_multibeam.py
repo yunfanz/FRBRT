@@ -2,7 +2,7 @@ import tensorflow as tf, numpy as np
 import argparse 
 from utils import find_files
 from blimpy import Waterfall
-from sigpyproc.Reader import FilReader
+from sigpyproc.Readers import FilReader
 import os
 from time import time
 from skimage import measure
@@ -42,7 +42,7 @@ def read_input(readers, t0, a=None, tstep=1024, nchan=320):
     for i in range(nbeams):
         #readers[i].read_data(t_start=t0, t_stop=t0+tstep)
         #a[i, ..., 0] = readers[i].data.squeeze().astype('uint8')
-        a[i, ..., 0] = readers[i].readBlock(start=t0, nsamp=tstep).T
+        a[i, ..., 0] = readers[i].readBlock(start=t0, nsamps=tstep).T
     return a
 
 def filter_detection(detections, n=3):
@@ -72,7 +72,7 @@ if __name__ == '__main__':
     files = sorted(files)[1:] #ignore primary beam
     print(files[:NBEAMS])
     readers = get_readers(files, NBEAMS)
-    NT = readers[0].n_ints_in_file
+    NT = readers[0].header['nsamples']
     dt = readers[0].header['tsamp']
     print('sampling time', dt)
     
