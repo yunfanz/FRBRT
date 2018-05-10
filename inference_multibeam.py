@@ -1,6 +1,6 @@
 import tensorflow as tf, numpy as np
 import argparse 
-from utils import find_files
+from utils import *
 from blimpy import Waterfall
 from sigpyproc.Readers import FilReader
 import os
@@ -13,37 +13,7 @@ parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, he
 parser.add_argument("--test_flag", default=None, type=str, help="flag of file to test")
 args = parser.parse_args()
 
-def load_graph(frozen_graph_filename):
-    """ Function to load frozen TensorFlow graph"""
-    with tf.gfile.GFile(frozen_graph_filename, "rb") as f:
-        graph_def = tf.GraphDef()
-        graph_def.ParseFromString(f.read())
-    with tf.Graph().as_default() as graph:
-        tf.import_graph_def(graph_def, name="prefix")
-    return graph
 
-def get_readers(fil_files, nbeams=16):
-    """Load blimpy Waterfall objects for filterbank file reading"""
-    fils = []
-    for f in sorted(fil_files)[:nbeams]:
-        #fils.append(Waterfall(f, load_data=False))
-        fils.append(FilReader(f))
-    return fils
-
-def read_input(readers, t0, a=None, tstep=1024, nchan=320):
-    """Read a chunck of data from each beam
-    output:
-    array of shape (nbeam, tstep, nchan, 1)
-    """
-    nbeams = len(readers)
-    u8 = (readers[0].header['nbits'] == 8)
-    if a is None:
-        a = np.zeros((nbeams, tstep, nchan, 1), dtype=np.uint8)
-    for i in range(nbeams):
-        #readers[i].read_data(t_start=t0, t_stop=t0+tstep)
-        #a[i, ..., 0] = readers[i].data.squeeze().astype('uint8')
-        a[i, ..., 0] = readers[i].readBlock(start=t0, nsamps=tstep).T
-    return a
 
 def filter_detection(detections, n=3):
     """Function to filter out detections in more than n adjacent beams"""
