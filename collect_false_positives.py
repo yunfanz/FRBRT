@@ -8,6 +8,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model", default="./dump/frozen_model.pb", type=str, help="Frozen model file to import")
 parser.add_argument("--offset", default=0, type=int, help="Initial offset from start of file")
 parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, help="Directory containing filterbanks")
+parser.add_argument("--test_flag", default=None, type=str, help="flag of file to test")
 args = parser.parse_args()
 
 
@@ -31,11 +32,11 @@ if __name__ == '__main__':
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    files = find_files(args.filterbank_dir, pattern='201*.fil')
+    files = find_files(args.filterbank_dir, pattern='201*.fil', flag=args.test_flag)
     print(len(files))
     print(sorted(files[:NBEAMS]))
     readers = get_readers(files, NBEAMS)
-    NT = readers[0].n_ints_in_file
+    NT = readers[0].header['nsamples']
     dt = readers[0].header['tsamp']
     print('sampling time', dt)
     detection_stats = []

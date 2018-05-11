@@ -64,7 +64,7 @@ if __name__ == '__main__':
                 print'{} / {},  speed: {} times real time'.format(t0,NT, speed) #print(y_out.shape)
             scores = y_out[:,1].copy()
             detections = scores > 0.5
-            detections = filter_detection(detections, n=3) 
+            #detections = filter_detection(detections, n=3) 
             ndetections = np.sum(detections)
             if ndetections > 0 and ndetections<5:
                 beams_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
