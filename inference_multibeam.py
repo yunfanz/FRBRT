@@ -10,6 +10,7 @@ from skimage import measure
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", default="./models/molonglo.pb", type=str, help="Frozen model file to import")
 parser.add_argument("--filterbank_dir", default="/data2/molonglo/", type=str, help="Directory containing filterbanks")
+parser.add_argument("--threshold", default=0.5, type=float, help="confident threshold of detection")
 parser.add_argument("--test_flag", default=None, type=str, help="flag of file to test")
 args = parser.parse_args()
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
                 speed = dt*TSTEP/duration
                 print'{} / {},  speed: {} times real time'.format(t0,NT, speed) #print(y_out.shape)
             scores = y_out[:,1].copy()
-            detections = scores > 0.5
+            detections = scores > args.threshold
             #detections = filter_detection(detections, n=3) 
             ndetections = np.sum(detections)
             if ndetections > 0 and ndetections<5:
