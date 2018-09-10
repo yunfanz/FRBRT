@@ -1,7 +1,7 @@
 import tensorflow as tf, numpy as np
 import argparse 
 from sigpyproc.Readers import FilReader
-import os
+import os, fnmatch
 from time import time
 from skimage import measure
 
@@ -56,7 +56,7 @@ def read_input(reader, t0, NT, a=None, tstep=256, batchsize=128, nchan=10944):
     output:
     array of shape (batchsize, tstep, nchan, 1)
     """
-    u8 = (readers[0].header['nbits'] == 8)
+    u8 = (reader.header['nbits'] == 8)
     if a is None:
         a = np.zeros((batchsize, tstep, nchan, 1), dtype=np.uint8)
 
@@ -82,11 +82,11 @@ if __name__ == '__main__':
     y = graph.get_tensor_by_name('prefix/output:0')
 
 
-    files = find_files(args.filterbank_dir, pattern='*.fil', flag=args.test_flag)
+    files = find_files(args.filterbank_dir, pattern='*.fil')
     files = sorted(files)
     reader = get_readers(files, 1)[0]
-    NT = readers.header['nsamples']
-    dt = readers.header['tsamp']
+    NT = reader.header['nsamples']
+    dt = reader.header['tsamp']
 
     print('sampling time', dt)
     
@@ -97,7 +97,7 @@ if __name__ == '__main__':
         a = None
         step = 0
         while t0 < NT:
-            a, to_mask = read_input(readers, t0, a=a)
+            a, to_mask = read_input(reader, t0, NT, a=a)
             t0 += TSTEP; step += 1
             start = time()
             y_out = sess.run(y, feed_dict={ x: a, is_training:False })
@@ -112,4 +112,5 @@ if __name__ == '__main__':
             ndetections = np.sum(detections)
             if ndetections > 0:
                 frames_with_detection = np.asarray([ind for ind, val in enumerate(detections) if val])
-                print("Detection at TOA",(t0/256+frames_with_detection)*dt, scores[frames_with_detection])
+                print t0, frames_with_detection
+                print("Detection at TOA",(t0/+frames_with_detection*256)*dt, scores[frames_with_detection])
